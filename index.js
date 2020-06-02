@@ -1,126 +1,109 @@
 const express = require("express");
-//const requiredata = require("./data/requiredata");
-//const requireid = require("requireid");
+const data = require("./data.js");
+
 const server = express();
+
+const port = 8000;
+
+server.listen(port, () => console.log(`\n == API on port ${port} == \n`));
+
+server.use(express.json());
 
 server.get("/", (req, res) => {
   res.json({ api: "up and running" });
   res.send("server is returning data");
 });
 
-const port = 8000;
-
-server.listen(port, ()=> console.log(`\n == API on port ${port} == \n`))
-
-server.use(express.json());
-
 server.post("/api/users", (req, res) => {
-  const Usermaker = req.body;
-  requiredata
-    .insert(Usermaker)
-    .then((add) => {
-      if (add.name === "" || add.bio === "") {
-        res
-          .status(400)
-          .json({ success: false, message: "name and bio required" });
-      } else {
-        const madeUser = {
-          id: requireid.generate(),
-          name: add.name,
-          bio: add.bio,
-        };
+  const newUser = data.createUser({
+    name: req.body.name,
+    bio: req.body.bio,
+  });
 
-        res.status(201).json({ success: true, message: "User created" });
-      }
-    })
-
-    .catch((err) =>
-      res
-        .status(500)
-        .json({ success: false, errorMessage: "error Usermaker failed", err })
-    );
+  if (newUser) {
+    try {
+      res.status(201).json(newUser);
+    } catch {
+      res.status(500).json({
+        errorMessage: "data did not grab",
+      });
+    }
+  } else {
+    res.status(400).json({
+      errorMessage: "name and bio required",
+    });
+  }
 });
 
 server.get("/api/users", (req, res) => {
-  requiredata
-    .find()
-    .then((getUser) => {
-      res.status(200).json(getUser);
-    })
+  const users = data.getUsers();
 
-    .catch((err) =>
-      res
-        .status(500)
-        .json({ success: false, errorMessage: "error getUser failed" })
-    );
+  if (users) {
+    res.json(users);
+  } else {
+    return res.status(500).json({
+      errorMessage: "error getUser failed",
+    });
+  }
 });
 
 server.get("/api/users/:id", (req, res) => {
-  const { id } = req.params;
+  const userId = req.params.id;
+  const user = data.getUserById(userId);
 
-  requiredata
-    .findById(id)
-    .then((getID) => {
-      if (getID) {
-        console.log(getID);
-        res.status(200).json(getID);
-      } else {
-        res
-          .status(404)
-          .json({ success: false, errorMessage: "user does not exist" });
-      }
-    })
-    .catch((err) =>
-      res
-        .status(500)
-        .json({ success: false, errorMessage: "error getID failed" })
-    );
+  if (user) {
+    try {
+      res.json(user);
+    } catch {
+      res.status(500).json({
+        errorMessage: "user does not exist",
+      });
+    }
+  } else {
+    res.status(404).json({
+      message: "error getID failed",
+    });
+  }
 });
 
 server.delete("/api/users/:id", (req, res) => {
-  const { id } = req.params;
+  const user = data.getUserById(req.params.id);
+  const err = new Error();
 
-  requiredata
-    .remove(id)
-    .then((deleted) => {
-      if (deleted) {
-        res.status(200).json(deleted);
-      } else {
-        res
-          .status(404)
-          .json({ success: false, errorMessage: "user does not exist" });
-      }
-    })
-    .catch((err) =>
-      res
-        .status(500)
-        .json({ success: false, errorMessage: "error deleted failed" })
-    );
+  if (user) {
+    try {
+      data.deleteUser(user.id);
+      res.status(204).end();
+    } catch {
+      res.status(500).json({
+        errorMessage: "user does not exist",
+      });
+    }
+  } else {
+    res.status(404).json({
+      message: "error deleted failed",
+    });
+  }
 });
 
 server.put("/api/users/:id", (req, res) => {
-  const { id } = req.params;
-  const userDetails = req.body;
+  const user = data.getUserById(req.params.id);
 
-  requiredata
-    .update(id, userDetails)
-
-    .then((updated) => {
-      if (updated) {
-        res.status(200).json(userDetails);
-      } else if (!userDetails.name || !userDetails.bio) {
-        res
-          .status(400)
-          .json({ success: false, errorMessage: "name and bio info missing" });
-      } else {
-        res
-          .status(404)
-          .json({ success: false, errorMessage: "user does not exist" });
-      }
-    })
-    .catch((err) =>
-      res
-        .status(500)
-        .json({ success: false, errorMessage: "error updated failed" })
-    );
+  if (user) {
+    try {
+      const updatedUser = data.updateUser(user.id, {
+        name: req.body.name || user.name,
+        bio: req.body.bio || user.bio,
+      });
+      res.status(200).json(updatedUser);
+    } catch (err) {
+      res.status(500).json({
+        errorMessage: "error updated failed",
+      });
+    }
+  } else {
+    res.status(404).json({
+      errorMessage: "user does not exist",
+    });
+  }
 });
